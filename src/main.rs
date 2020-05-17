@@ -8,28 +8,18 @@ use rand::Rng;
 const ASPECT_RATIO: f32 = 16.0/9.0;
 const IMG_WIDTH: usize = 512;
 const IMG_HEIGHT: usize = (IMG_WIDTH as f32 / ASPECT_RATIO) as usize;
-const SAMPLES_PER_PIXEL: usize = 10;
+const SAMPLES_PER_PIXEL: usize = 100;
 const RAY_BIAS: f32 = 0.001;
 const MAX_DEPTH: u32 = 30;
 #[derive(Debug)]
 #[derive(Clone)]
 #[derive(Copy)]
+
 struct Vec3{
     x: f32,
     y: f32,
     z: f32
 }
-impl ops::Neg for &Vec3{
-    type Output = Vec3;
-    fn neg(self)->Vec3{
-        return Vec3{
-            x: -self.x,
-            y: -self.y,
-            z: -self.z
-        }
-    }
-}
-
 impl ops::Neg for Vec3{
     type Output = Vec3;
     fn neg(self)->Vec3{
@@ -41,33 +31,6 @@ impl ops::Neg for Vec3{
     }
 }
 
-impl ops::Add<&Vec3> for &Vec3{
-    type Output = Vec3;
-    fn add(self, rhs: &Vec3)->Vec3{
-        return Vec3{
-            x: self.x + rhs.x, 
-            y: self.y + rhs.y, 
-            z: self.z + rhs.z}
-    }
-}
-impl ops::Add<&Vec3> for Vec3{
-    type Output = Vec3;
-    fn add(self, rhs: &Vec3)->Vec3{
-        return Vec3{
-            x: self.x + rhs.x, 
-            y: self.y + rhs.y, 
-            z: self.z + rhs.z}
-    }
-}
-impl ops::Add<Vec3> for &Vec3{
-    type Output = Vec3;
-    fn add(self, rhs: Vec3)->Vec3{
-        return Vec3{
-            x: self.x + rhs.x, 
-            y: self.y + rhs.y, 
-            z: self.z + rhs.z}
-    }
-}
 impl ops::Add<Vec3> for Vec3{
     type Output = Vec3;
     fn add(self, rhs: Vec3)->Vec3{
@@ -78,36 +41,6 @@ impl ops::Add<Vec3> for Vec3{
     }
 }
 
-impl ops::Sub<&Vec3> for &Vec3{
-    type Output = Vec3;
-    fn sub(self, rhs: &Vec3)->Vec3{
-        return Vec3{
-            x: self.x - rhs.x, 
-            y: self.y - rhs.y, 
-            z: self.z - rhs.z}
-    }
-}
-
-impl ops::Sub<&Vec3> for Vec3{
-    type Output = Vec3;
-    fn sub(self, rhs: &Vec3)->Vec3{
-        return Vec3{
-            x: self.x - rhs.x, 
-            y: self.y - rhs.y, 
-            z: self.z - rhs.z}
-    }
-}
-
-
-impl ops::Sub<Vec3> for &Vec3{
-    type Output = Vec3;
-    fn sub(self, rhs: Vec3)->Vec3{
-        return Vec3{
-            x: self.x - rhs.x, 
-            y: self.y - rhs.y, 
-            z: self.z - rhs.z}
-    }
-}
 impl ops::Sub<Vec3> for Vec3{
     type Output = Vec3;
     fn sub(self, rhs: Vec3)->Vec3{
@@ -118,33 +51,6 @@ impl ops::Sub<Vec3> for Vec3{
     }
 }
 
-impl ops::Mul<&f32> for &Vec3{
-    type Output = Vec3;
-    fn mul(self, rhs: &f32)->Vec3{
-        return Vec3{
-            x: self.x * rhs, 
-            y: self.y * rhs, 
-            z: self.z * rhs}
-    }
-}
-impl ops::Mul<f32> for &Vec3{
-    type Output = Vec3;
-    fn mul(self, rhs: f32)->Vec3{
-        return Vec3{
-            x: self.x * rhs, 
-            y: self.y * rhs, 
-            z: self.z * rhs}
-    }
-}
-impl ops::Mul<&f32> for Vec3{
-    type Output = Vec3;
-    fn mul(self, rhs: &f32)->Vec3{
-        return Vec3{
-            x: self.x * rhs, 
-            y: self.y * rhs, 
-            z: self.z * rhs}
-    }
-}
 impl ops::Mul<f32> for Vec3{
     type Output = Vec3;
     fn mul(self, rhs: f32)->Vec3{
@@ -152,33 +58,6 @@ impl ops::Mul<f32> for Vec3{
             x: self.x * rhs, 
             y: self.y * rhs, 
             z: self.z * rhs}
-    }
-}
-impl ops::Div<&f32> for &Vec3{
-    type Output = Vec3;
-    fn div(self, rhs: &f32)->Vec3{
-        return Vec3{
-            x: self.x / rhs, 
-            y: self.y / rhs, 
-            z: self.z / rhs}
-    }
-}
-impl ops::Div<f32> for &Vec3{
-    type Output = Vec3;
-    fn div(self, rhs: f32)->Vec3{
-        return Vec3{
-            x: self.x / rhs, 
-            y: self.y / rhs, 
-            z: self.z / rhs}
-    }
-}
-impl ops::Div<&f32> for Vec3{
-    type Output = Vec3;
-    fn div(self, rhs: &f32)->Vec3{
-        return Vec3{
-            x: self.x / rhs, 
-            y: self.y / rhs, 
-            z: self.z / rhs}
     }
 }
 impl ops::Div<f32> for Vec3{
@@ -209,7 +88,7 @@ impl Vec3{
     }
     fn normalized(&self)->Vec3{
         let l = self.length();
-        return self/&l;
+        return (*self)/l;
     }
 }
 
@@ -268,8 +147,8 @@ impl Ray{
             direction: direction.normalized()
         }
     }
-    fn at(&self, t: &f32)->Vec3{
-        return &self.origin + &(&self.direction * t);
+    fn at(&self, t: f32)->Vec3{
+        return self.origin + (self.direction * t);
     }
 }
 struct HitStruct{
@@ -314,12 +193,12 @@ impl Hittable for Sphere{
             let root = discriminant.sqrt();
             let temp = (-half_b - root) / a;
             if temp < t_max && temp > t_min{
-                let pt = ray.at(&temp);
+                let pt = ray.at(temp);
                 return Some(HitStruct::new(ray, pt, (pt - self.center)/self.radius, temp));
             }
             let temp = (-half_b + root) / a;
             if temp < t_max && temp > t_min{
-                let pt = ray.at(&temp);
+                let pt = ray.at(temp);
                 return Some(HitStruct::new(ray, pt, (pt - self.center)/self.radius, temp));
             }
         }
