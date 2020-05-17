@@ -1,9 +1,14 @@
 use std::path::Path;
 use std::fs::File;
 use std::io::BufWriter;
-use std::ops;
 use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
+mod math;
+mod color;
+mod random;
+pub use crate::math::Vec3;
+pub use crate::color::{Color, blend};
+pub use crate::random::random_unit_vector;
 
 const ASPECT_RATIO: f32 = 16.0/9.0;
 const IMG_WIDTH: usize = 512;
@@ -11,131 +16,7 @@ const IMG_HEIGHT: usize = (IMG_WIDTH as f32 / ASPECT_RATIO) as usize;
 const SAMPLES_PER_PIXEL: usize = 100;
 const RAY_BIAS: f32 = 0.001;
 const MAX_DEPTH: u32 = 30;
-#[derive(Debug)]
-#[derive(Clone)]
-#[derive(Copy)]
 
-struct Vec3{
-    x: f32,
-    y: f32,
-    z: f32
-}
-impl ops::Neg for Vec3{
-    type Output = Vec3;
-    fn neg(self)->Vec3{
-        return Vec3{
-            x: -self.x,
-            y: -self.y,
-            z: -self.z
-        }
-    }
-}
-
-impl ops::Add<Vec3> for Vec3{
-    type Output = Vec3;
-    fn add(self, rhs: Vec3)->Vec3{
-        return Vec3{
-            x: self.x + rhs.x, 
-            y: self.y + rhs.y, 
-            z: self.z + rhs.z}
-    }
-}
-
-impl ops::Sub<Vec3> for Vec3{
-    type Output = Vec3;
-    fn sub(self, rhs: Vec3)->Vec3{
-        return Vec3{
-            x: self.x - rhs.x, 
-            y: self.y - rhs.y, 
-            z: self.z - rhs.z}
-    }
-}
-
-impl ops::Mul<f32> for Vec3{
-    type Output = Vec3;
-    fn mul(self, rhs: f32)->Vec3{
-        return Vec3{
-            x: self.x * rhs, 
-            y: self.y * rhs, 
-            z: self.z * rhs}
-    }
-}
-impl ops::Div<f32> for Vec3{
-    type Output = Vec3;
-    fn div(self, rhs: f32)->Vec3{
-        return Vec3{
-            x: self.x / rhs, 
-            y: self.y / rhs, 
-            z: self.z / rhs}
-    }
-}
-impl Vec3{
-    fn new(x: f32, y: f32, z:f32)->Vec3{
-        return Vec3{x: x, y:y, z:z};
-    }
-    fn dot(&self, rhs: &Vec3)->f32{
-        return self.x * rhs.x + self.y * rhs.y + self.z * rhs.z;
-    }
-    fn cross(&self, rhs: &Vec3)->Vec3{
-        return Vec3{
-            x : self.y * rhs.z - self.z * rhs.y,
-            y: self.z * rhs.x - self.x * rhs.z,
-            z: self.x * rhs.y - self.y * rhs.x
-        }
-    }
-    fn length(&self)->f32{
-        return (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
-    }
-    fn normalized(&self)->Vec3{
-        let l = self.length();
-        return (*self)/l;
-    }
-}
-
-#[derive(Debug)]
-#[derive(Clone)]
-#[derive(Copy)]
-struct Color{
-    r: f32,
-    g: f32, 
-    b: f32
-}
-impl Color{
-    fn new(r: f32, g: f32, b: f32)->Color{
-        return Color{r:r, g:g, b:b};
-    }
-    fn black()->Color{
-        return Color{r:0.0, g:0.0, b:0.0};
-    }
-    fn data(&self)->[u8; 3]{
-        return [(self.r * 255.0).round() as u8, (self.g * 255.0).round() as u8, (self.b * 255.0).round() as u8];
-    }
-}
-impl ops::Add<Color> for Color{
-    type Output = Color;
-    fn add(self, rhs: Color)->Color{
-        return Color{
-            r: self.r + rhs.r, 
-            g: self.g + rhs.g, 
-            b: self.b + rhs.b}
-    }
-}
-impl ops::Div<f32> for Color{
-    type Output = Color;
-    fn div(self, rhs: f32)->Color{
-        return Color{
-            r: self.r / rhs, 
-            g: self.g / rhs, 
-            b: self.b / rhs}
-    }
-}
-fn blend(a: &Color, b: &Color, t: &f32)->Color{
-    return Color::new(
-        a.r * t + b.r*(1.0-t),
-        a.g * t + b.g*(1.0-t),
-        a.b * t + b.b*(1.0-t)
-    );
-}
 struct Ray{
     origin: Vec3,
     direction: Vec3
@@ -255,25 +136,7 @@ impl Camera{
         return Ray::new(self.origin, self.lower_left_corner + self.horizontal * u + self.vertical * v - self.origin);
     }
 }
-fn random_unit_vector<R: Rng>(rng: &mut R)->Vec3{
-    let dist1 = Uniform::from(0.0 ..= 2.0 * std::f32::consts::PI);
-    let dist2 = Uniform::from(-1.0 ..= 1.0);
-    let a:f32 = dist1.sample(rng);
-    let z:f32 = dist2.sample(rng);
-    let r = (1.0 - z * z).sqrt();
-    return Vec3::new(r*(a.cos()), r * (a.sin()), z);
-}
-fn random_in_unit_sphere<R: Rng>(rng: &mut R)->Vec3{
-    loop{
-        let dist = Uniform::from(-1.0 ..= 1.0);
-        let a = dist.sample(rng);
-        let b = dist.sample(rng);
-        let c = dist.sample(rng);
-        if (a*a + b*b + c*c) <= 1.0{
-            return Vec3::new(a, b, c);
-        }
-    }
-}
+
 fn ray_color<R: Rng>(ray: &Ray, world: &HittableList, depth: u32, rng: &mut R)->Color{
     if depth == 0{
         return Color::black();
