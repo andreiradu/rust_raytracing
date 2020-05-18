@@ -6,9 +6,12 @@ use rand::Rng;
 mod math;
 mod color;
 mod random;
-pub use crate::math::Vec3;
-pub use crate::color::{Color, blend};
-pub use crate::random::random_unit_vector;
+mod ray;
+mod material;
+use crate::math::Vec3;
+use crate::color::{Color, blend, modulate};
+use crate::ray::{Ray, HitStruct, Hittable};
+use crate::material::{Material,Lambertian};
 
 const ASPECT_RATIO: f32 = 16.0/9.0;
 const IMG_WIDTH: usize = 512;
@@ -17,53 +20,19 @@ const SAMPLES_PER_PIXEL: usize = 100;
 const RAY_BIAS: f32 = 0.001;
 const MAX_DEPTH: u32 = 30;
 
-struct Ray{
-    origin: Vec3,
-    direction: Vec3
-}
-impl Ray{
-    fn new(origin: Vec3, direction: Vec3)->Ray{
-        return Ray{
-            origin: origin,
-            direction: direction.normalized()
-        }
-    }
-    fn at(&self, t: f32)->Vec3{
-        return self.origin + (self.direction * t);
-    }
-}
-struct HitStruct{
-    point: Vec3,
-    normal: Vec3,
-    t: f32,
-    front_facing: bool
-}
-impl HitStruct{
-    fn new(ray: &Ray, point: Vec3, outward_normal: Vec3, t: f32)->HitStruct{
-        let front_face = ray.direction.dot(&outward_normal) < 0.0;
-        return HitStruct{
-            point: point,
-            normal: if front_face{outward_normal}else{-outward_normal},
-            t: t,
-            front_facing: front_face
-        }
-    }
-}
-trait Hittable{
-    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32)->Option<HitStruct>;
-}
 
-struct Sphere{
+struct Sphere<R: Rng>{
     center: Vec3,
-    radius: f32
+    radius: f32,
+    material: Box<dyn Material<R>>
 }
-impl Sphere{
-    fn new(center: Vec3, radius: f32)->Box<Sphere>{
-        return Box::new(Sphere{center: center, radius: radius});
+impl<R: Rng> Sphere<R>{
+    fn new(material: Box<dyn Material<R>>, center: Vec3, radius: f32)->Box<Sphere<R>>{
+        return Box::new(Sphere{material: material, center: center, radius: radius});
     }
 }
-impl Hittable for Sphere{
-    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32)->Option<HitStruct>
+impl<R: Rng> Hittable<R> for Sphere<R>{
+    fn hit<'a>(&'a self, ray: &Ray, t_min: f32, t_max: f32)->Option<HitStruct<'a, R>>
     {
         let oc = ray.origin - self.center;
         let a = ray.direction.dot(&ray.direction);
@@ -75,31 +44,31 @@ impl Hittable for Sphere{
             let temp = (-half_b - root) / a;
             if temp < t_max && temp > t_min{
                 let pt = ray.at(temp);
-                return Some(HitStruct::new(ray, pt, (pt - self.center)/self.radius, temp));
+                return Some(HitStruct::new(&*self.material, ray, pt, (pt - self.center)/self.radius, temp));
             }
             let temp = (-half_b + root) / a;
             if temp < t_max && temp > t_min{
                 let pt = ray.at(temp);
-                return Some(HitStruct::new(ray, pt, (pt - self.center)/self.radius, temp));
+                return Some(HitStruct::new( &*self.material, ray, pt, (pt - self.center)/self.radius, temp));
             }
         }
         return None;
     }
 }
 
-struct HittableList{
-    objects: Vec<Box<dyn Hittable>>
+struct HittableList<R: Rng>{
+    objects: Vec<Box<dyn Hittable<R>>>
 }
-impl HittableList{
-    fn new()->HittableList{
+impl<R: Rng> HittableList<R>{
+    fn new()->HittableList<R>{
         return HittableList{objects: vec!()};
     }
-    fn add(&mut self, object:Box<dyn Hittable>){
+    fn add(&mut self, object:Box<dyn Hittable<R>>){
         self.objects.push(object);
     }
 }
-impl Hittable for HittableList{
-    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32)->Option<HitStruct>{
+impl<R: Rng> Hittable<R> for HittableList<R>{
+    fn hit<'a>(&'a self, ray: & Ray, t_min: f32, t_max: f32)->Option<HitStruct<'a, R>>{
         let mut ret = None;
         let mut closeset_so_far = t_max;
         for obj in &self.objects{
@@ -137,14 +106,16 @@ impl Camera{
     }
 }
 
-fn ray_color<R: Rng>(ray: &Ray, world: &HittableList, depth: u32, rng: &mut R)->Color{
+fn ray_color<R: Rng>(ray: &Ray, world: &HittableList<R>, depth: u32, rng: &mut R)->Color{
     if depth == 0{
         return Color::black();
     }
     match world.hit(ray, RAY_BIAS, std::f32::MAX) {
         Some(res)=>{
-            let dir = res.normal + random_unit_vector(rng);
-            return ray_color(&Ray::new(res.point, dir), world, depth - 1,rng)/2.0;
+            match res.material.scatter(rng, ray, &res){
+                Some(scatter_res)=>{return modulate(&scatter_res.attenuation, &ray_color(&scatter_res.scattered_ray, world, depth - 1, rng))}
+                _=>{return Color::black()}
+            }
         }
         _=>{}
     } 
@@ -167,8 +138,10 @@ fn main() {
     let camera = Camera::new(ASPECT_RATIO, 2.0, 1.0, Vec3::new(0.0, 0.0, 0.0));
 
     let mut world = HittableList::new();
-    world.add(Sphere::new(Vec3::new(0.0, 0.0, -1.0), 0.5));
-    world.add(Sphere::new(Vec3::new(0.0, -100.5, -1.0), 100.0));
+    let material1 = Lambertian::new(Color::gray());
+    let material2 = Lambertian::new(Color::green());
+    world.add(Sphere::new(material1, Vec3::new(0.0, 0.0, -1.0), 0.5));
+    world.add(Sphere::new(material2, Vec3::new(0.0, -100.5, -1.0), 100.0));
     let mut rng = rand::thread_rng();
     let dist = Uniform::from(0.0 .. 1.0);
     for j in (0..IMG_HEIGHT).rev(){

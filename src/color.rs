@@ -15,6 +15,12 @@ impl Color{
     pub fn black()->Color{
         return Color{r:0.0, g:0.0, b:0.0};
     }
+    pub fn gray()->Color{
+        return Color{r:0.5, g:0.5, b:0.5};
+    }
+    pub fn green()->Color{
+        return Color{r:0.0, g:0.75, b:0.0};
+    }
     pub fn data(&self)->[u8; 3]{
         return [(self.r * 255.0).round() as u8, (self.g * 255.0).round() as u8, (self.b * 255.0).round() as u8];
     }
@@ -43,4 +49,8 @@ pub fn blend(a: &Color, b: &Color, t: &f32)->Color{
         a.g * t + b.g*(1.0-t),
         a.b * t + b.b*(1.0-t)
     );
+}
+
+pub fn modulate(a: &Color, b: &Color)->Color{
+    return Color::new(a.r * b.r, a.g*b.g, a.b*b.b);
 }
