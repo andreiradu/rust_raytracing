@@ -11,12 +11,12 @@ mod material;
 use crate::math::Vec3;
 use crate::color::{Color, blend, modulate};
 use crate::ray::{Ray, HitStruct, Hittable};
-use crate::material::{Material,Lambertian};
+use crate::material::{Material,Lambertian, Metal};
 
 const ASPECT_RATIO: f32 = 16.0/9.0;
 const IMG_WIDTH: usize = 512;
 const IMG_HEIGHT: usize = (IMG_WIDTH as f32 / ASPECT_RATIO) as usize;
-const SAMPLES_PER_PIXEL: usize = 100;
+const SAMPLES_PER_PIXEL: usize = 1000;
 const RAY_BIAS: f32 = 0.001;
 const MAX_DEPTH: u32 = 30;
 
@@ -138,10 +138,13 @@ fn main() {
     let camera = Camera::new(ASPECT_RATIO, 2.0, 1.0, Vec3::new(0.0, 0.0, 0.0));
 
     let mut world = HittableList::new();
-    let material1 = Lambertian::new(Color::gray());
-    let material2 = Lambertian::new(Color::green());
-    world.add(Sphere::new(material1, Vec3::new(0.0, 0.0, -1.0), 0.5));
-    world.add(Sphere::new(material2, Vec3::new(0.0, -100.5, -1.0), 100.0));
+
+    world.add(Sphere::new(Lambertian::new(Color::new(0.7, 0.3, 0.3)), Vec3::new(0.0, 0.0, -1.0), 0.5));
+    world.add(Sphere::new(Lambertian::new(Color::new(0.8, 0.8, 0.0)), Vec3::new(0.0, -100.5, -1.0), 100.0));
+
+    world.add(Sphere::new(Metal::new(Color::new(0.8, 0.6, 0.2), 1.0), Vec3::new(1.0, 0.0, -1.0), 0.5));
+    world.add(Sphere::new(Metal::new(Color::new(0.8, 0.8, 0.8), 0.3), Vec3::new(-1.0, 0.0, -1.0), 0.5));
+
     let mut rng = rand::thread_rng();
     let dist = Uniform::from(0.0 .. 1.0);
     for j in (0..IMG_HEIGHT).rev(){

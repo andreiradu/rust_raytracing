@@ -50,6 +50,7 @@ impl ops::Mul<f32> for Vec3{
             z: self.z * rhs}
     }
 }
+
 impl ops::Div<f32> for Vec3{
     type Output = Vec3;
     fn div(self, rhs: f32)->Vec3{
@@ -80,4 +81,7 @@ impl Vec3{
         let l = self.length();
         return (*self)/l;
     }
+}
+pub fn reflect(v: Vec3, n: Vec3) -> Vec3{
+    return v - n * v.dot(&n) *  2.0;
 }
