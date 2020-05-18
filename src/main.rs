@@ -8,6 +8,7 @@ mod color;
 mod random;
 mod ray;
 mod material;
+use crate::random::random_in_unit_disk;
 use crate::math::Vec3;
 use crate::color::{Color, blend, modulate};
 use crate::ray::{Ray, HitStruct, Hittable};
@@ -16,7 +17,7 @@ use crate::material::{Material,Lambertian, Metal, Transparent};
 const ASPECT_RATIO: f32 = 16.0/9.0;
 const IMG_WIDTH: usize = 512;
 const IMG_HEIGHT: usize = (IMG_WIDTH as f32 / ASPECT_RATIO) as usize;
-const SAMPLES_PER_PIXEL: usize = 1000;
+const SAMPLES_PER_PIXEL: usize = 100;
 const RAY_BIAS: f32 = 0.001;
 const MAX_DEPTH: u32 = 50;
 
@@ -87,22 +88,41 @@ struct Camera{
     origin: Vec3,
     lower_left_corner: Vec3,
     horizontal: Vec3,
-    vertical: Vec3
+    vertical: Vec3,
+    u: Vec3,
+    v: Vec3, 
+    w: Vec3,
+    lens_radius: f32
 }
 impl Camera{
-    fn new(aspect_ratio: f32, viewport_height: f32, focal_length: f32, origin: Vec3)->Camera{
+    fn new(aspect_ratio: f32, vfov: f32, origin: Vec3, look_at: Vec3, up: Vec3, aperture: f32, focus_dist: f32)->Camera{
+        let theta = vfov.to_radians();
+        let h = (0.5 * theta).tan();
+
+        let viewport_height = 2.0 * h;
         let viewport_width = aspect_ratio * viewport_height;
-        let horizontal = Vec3::new(viewport_width, 0.0, 0.0);
-        let vertical = Vec3::new(0.0, viewport_height, 0.0);
+
+        let w = (origin - look_at).normalized();
+        let u = up.cross(&w).normalized();
+        let v = w.cross(&u);
+
+        let horizontal = u * viewport_width * focus_dist;
+        let vertical = v * viewport_height * focus_dist;
         return Camera{
             origin: origin,
-            lower_left_corner: origin - horizontal / 2.0 - vertical / 2.0 - Vec3::new(0.0, 0.0, focal_length),
+            lower_left_corner: origin - horizontal / 2.0 - vertical / 2.0 - w * focus_dist,
             horizontal: horizontal,
-            vertical: vertical
+            vertical: vertical,
+            u: u,
+            v: v,
+            w: w,
+            lens_radius: aperture * 0.5
         }
     }
-    fn get_ray(&self, u: f32, v: f32)->Ray{
-        return Ray::new(self.origin, self.lower_left_corner + self.horizontal * u + self.vertical * v - self.origin);
+    fn get_ray<R: Rng>(&self, rng: &mut R, s: f32, t: f32)->Ray{
+        let rd = random_in_unit_disk(rng) * self.lens_radius;
+        let offset = self.u * rd.x + self.v * rd.y;
+        return Ray::new(self.origin + offset, self.lower_left_corner + self.horizontal * s + self.vertical * t - self.origin - offset);
     }
 }
 
@@ -135,12 +155,15 @@ fn main() {
 
     let mut data = Vec::with_capacity(IMG_WIDTH * IMG_HEIGHT * 4);
 
-    let camera = Camera::new(ASPECT_RATIO, 2.0, 1.0, Vec3::new(0.0, 0.0, 0.0));
+    let origin = Vec3::new(3.0, 3.0, 2.0);
+    let look_at = Vec3::new(0.0, 0.0, -1.0);
+    let up = Vec3::new(0.0, 1.0, 0.0);
+    let camera = Camera::new(ASPECT_RATIO, 25.0, origin, look_at, up, 1.0, (look_at - origin).length());
 
     let mut world = HittableList::new();
 
-    world.add(Sphere::new(Lambertian::new(Color::new(0.7, 0.3, 0.3)), Vec3::new(0.0, 0.0, -1.0), 0.5));
     world.add(Sphere::new(Lambertian::new(Color::new(0.8, 0.8, 0.0)), Vec3::new(0.0, -100.5, -1.0), 100.0));
+    world.add(Sphere::new(Lambertian::new(Color::new(0.7, 0.3, 0.3)), Vec3::new(0.0, 0.0, -1.0), 0.5));
 
     world.add(Sphere::new(Metal::new(Color::new(0.8, 0.6, 0.2), 1.0), Vec3::new(1.0, 0.0, -1.0), 0.5));
     world.add(Sphere::new(Transparent::new(1.5), Vec3::new(-1.0, 0.0, -1.0), -0.45));
@@ -156,7 +179,7 @@ fn main() {
             for s in 0..SAMPLES_PER_PIXEL{
                 let u = (i as f32 + dist.sample(&mut rng))/(IMG_WIDTH as f32 - 1.0);
                 let v = (j as f32 + dist.sample(&mut rng))/(IMG_HEIGHT as f32 - 1.0);
-                let r = camera.get_ray(u, v);
+                let r = camera.get_ray(&mut rng, u, v);
                 c = c + ray_color(&r, &world, MAX_DEPTH, &mut rng);
             }
             c = c / (SAMPLES_PER_PIXEL as f32);
