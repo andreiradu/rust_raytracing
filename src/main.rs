@@ -11,14 +11,14 @@ mod material;
 use crate::math::Vec3;
 use crate::color::{Color, blend, modulate};
 use crate::ray::{Ray, HitStruct, Hittable};
-use crate::material::{Material,Lambertian, Metal};
+use crate::material::{Material,Lambertian, Metal, Transparent};
 
 const ASPECT_RATIO: f32 = 16.0/9.0;
 const IMG_WIDTH: usize = 512;
 const IMG_HEIGHT: usize = (IMG_WIDTH as f32 / ASPECT_RATIO) as usize;
 const SAMPLES_PER_PIXEL: usize = 1000;
 const RAY_BIAS: f32 = 0.001;
-const MAX_DEPTH: u32 = 30;
+const MAX_DEPTH: u32 = 50;
 
 
 struct Sphere<R: Rng>{
@@ -143,7 +143,9 @@ fn main() {
     world.add(Sphere::new(Lambertian::new(Color::new(0.8, 0.8, 0.0)), Vec3::new(0.0, -100.5, -1.0), 100.0));
 
     world.add(Sphere::new(Metal::new(Color::new(0.8, 0.6, 0.2), 1.0), Vec3::new(1.0, 0.0, -1.0), 0.5));
-    world.add(Sphere::new(Metal::new(Color::new(0.8, 0.8, 0.8), 0.3), Vec3::new(-1.0, 0.0, -1.0), 0.5));
+    world.add(Sphere::new(Transparent::new(1.5), Vec3::new(-1.0, 0.0, -1.0), -0.45));
+    world.add(Sphere::new(Transparent::new(1.5), Vec3::new(-1.0, 0.0, -1.0), 0.5));
+    //world.add(Sphere::new(Metal::new(Color::new(0.8, 0.8, 0.8), 0.3), Vec3::new(-1.0, 0.0, -1.0), 0.5));
 
     let mut rng = rand::thread_rng();
     let dist = Uniform::from(0.0 .. 1.0);

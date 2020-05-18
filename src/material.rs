@@ -1,7 +1,8 @@
 use crate::ray::{Ray, HitStruct};
 use crate::color::Color;
 use crate::random::{random_unit_vector, random_in_unit_sphere};
-use crate::math::{Vec3, reflect};
+use crate::math::{Vec3, reflect, refract};
+use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
 
 pub struct ScatterResult{
@@ -52,5 +53,57 @@ impl<R: Rng> Material<R> for Metal{
             scattered_ray: Ray::new(hit_record.point, reflected),
             attenuation: self.albedo
         })
+    }
+}
+fn schlick(cosine: f32, ref_idx: f32) -> f32{
+    let r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
+    let r0 = r0*r0;
+    return r0 + (1.0 - r0) * ((1.0 - cosine).powf(5.0));
+}
+
+pub struct Transparent{
+    ref_idx: f32
+}
+impl Transparent{
+    pub fn new(ref_index: f32)->Box<Transparent>{
+        return Box::new(Transparent{ref_idx: ref_index});
+    }
+}
+
+impl<R: Rng> Material<R> for Transparent{
+    fn scatter(&self, rng: &mut R, ray_in: &Ray, hit_record: &HitStruct<R>)->Option<ScatterResult>
+    {
+        let relative_ior = if hit_record.front_facing {1.0/self.ref_idx} else {self.ref_idx};
+        let cos_theta = (-ray_in.direction.dot(&hit_record.normal)).min(1.0);
+        let sin_theta = (1.0 - cos_theta*cos_theta).sqrt();
+        if relative_ior * sin_theta > 1.0{
+            let reflected = reflect(ray_in.direction, hit_record.normal);
+            return Some(ScatterResult{
+                scattered_ray: Ray::new(hit_record.point, reflected),
+                attenuation: Color::white()
+            })
+        }
+        let reflect_prob = schlick(cos_theta, relative_ior);
+        if Uniform::from(0.0 .. 1.0).sample(rng) < reflect_prob{
+            let reflected = reflect(ray_in.direction, hit_record.normal);
+            return Some(ScatterResult{
+                scattered_ray: Ray::new(hit_record.point, reflected),
+                attenuation: Color::white()
+            })
+        }
+        match refract(ray_in.direction, hit_record.normal, relative_ior){
+            Some(refracted)=>
+                return Some(ScatterResult{
+                    scattered_ray: Ray::new(hit_record.point, refracted),
+                    attenuation: Color::white()
+                }),
+            None => {
+                let reflected = reflect(ray_in.direction, hit_record.normal);
+                return Some(ScatterResult{
+                    scattered_ray: Ray::new(hit_record.point, reflected),
+                    attenuation: Color::white()
+                })
+            } 
+        }
     }
 }

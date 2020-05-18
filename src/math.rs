@@ -77,6 +77,9 @@ impl Vec3{
     pub fn length(&self)->f32{
         return (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
     }
+    pub fn length_sq(&self)->f32{
+        return self.x * self.x + self.y * self.y + self.z * self.z;
+    }
     pub fn normalized(&self)->Vec3{
         let l = self.length();
         return (*self)/l;
@@ -84,4 +87,13 @@ impl Vec3{
 }
 pub fn reflect(v: Vec3, n: Vec3) -> Vec3{
     return v - n * v.dot(&n) *  2.0;
+}
+pub fn  refract(v: Vec3, n: Vec3, relative_ior: f32) -> Option<Vec3> {
+    let cos_theta = (-v).dot(&n);
+    let r_out_parallel =  (v + n * cos_theta) * relative_ior;
+    if r_out_parallel.length_sq() > 1.0{
+        return None;
+    }
+    let r_out_perp =  -n * (1.0 - r_out_parallel.length_sq()).sqrt();
+    return Some(r_out_parallel + r_out_perp);
 }
