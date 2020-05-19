@@ -1,4 +1,6 @@
 use std::ops;
+use rand::Rng;
+use rand::distributions::{Distribution, Uniform};
 
 #[derive(Debug)]
 #[derive(Clone)]
@@ -23,6 +25,14 @@ impl Color{
     }
     pub fn green()->Color{
         return Color{r:0.0, g:0.75, b:0.0};
+    }
+    pub fn random<R: Rng>(rng: &mut R)->Color{
+        let dist = Uniform::from(0.0 ..= 1.0);
+        return Color{r: dist.sample(rng), g: dist.sample(rng), b: dist.sample(rng)};
+    }
+    pub fn random_metal<R: Rng>(rng: &mut R)->Color{
+        let dist = Uniform::from(0.5 ..= 1.0);
+        return Color{r: dist.sample(rng), g: dist.sample(rng), b: dist.sample(rng)};
     }
     pub fn data(&self)->[u8; 3]{
         return [(self.r * 255.0).round() as u8, (self.g * 255.0).round() as u8, (self.b * 255.0).round() as u8];

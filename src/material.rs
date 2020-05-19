@@ -1,13 +1,14 @@
 use crate::ray::{Ray, HitStruct};
 use crate::color::Color;
 use crate::random::{random_unit_vector, random_in_unit_sphere};
-use crate::math::{Vec3, reflect, refract};
+use crate::math::{reflect, refract};
 use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
 
 pub struct ScatterResult{
     pub scattered_ray: Ray,
     pub attenuation: Color
+    
 }
 pub trait Material<R: Rng>{
     fn scatter(&self, rng: &mut R, ray_in: &Ray, hit_record: &HitStruct<R>)->Option<ScatterResult>;
